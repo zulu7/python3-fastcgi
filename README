@@ -1,4 +1,4 @@
-This library is for python 2.3+.
+This library is for python 2.3+ (including python 3).
 
 This library requires the Open Market FastCGI Library/SDK.
 
@@ -9,3 +9,12 @@ http://www.fastcgi.com/dist/fcgi-2.4.0.tar.gz
 
 Development snapshot:
 http://www.fastcgi.com/dist/fcgi-2.4.1-SNAP-0311112127.tar.gz
+
+Note: to compile the library you will likely need to add
+#include <stdio.h>
+to fcgi-2.4.0/libfcgi/fcgio.cpp
+
+When installing, install to /usr/lib rather than the default
+/usr/local/lib
+
+
