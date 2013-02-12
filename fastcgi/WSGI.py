@@ -1,4 +1,4 @@
-from Server import ThreadedServer, ForkingServer
+from fastcgi.Server import ThreadedServer, ForkingServer
 import traceback
 
 
@@ -37,7 +37,8 @@ class WSGIMixIn:
                 try:
                     if headers_sent:
                         # Re-raise original exception if headers sent
-                        raise exc_info[0], exc_info[1], exc_info[2]
+                        #raise exc_info[0], exc_info[1], exc_info[2]
+                        raise AssertionError('Headers already sent')
                 finally:
                     exc_info = None     # avoid dangling circular ref
             elif headers_set:

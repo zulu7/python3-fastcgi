@@ -1,8 +1,4 @@
-#from distutils.core import setup, Extension
-from ez_setup import use_setuptools
-use_setuptools()
-from setuptools import setup, Extension
-
+from distutils.core import setup, Extension
 
 c_ext = Extension("fcgi", ["fastcgi/pyfcgi.c"], libraries=["fcgi"],
                   include_dirs=["/usr/local/include"],
@@ -29,6 +25,5 @@ setup(name="python-fastcgi",
       packages=["fastcgi"],
       #data_files=[("share/doc/python-fastcgi/example", ["example/test.fcgi"])],
       ext_package='fastcgi',
-      ext_modules=[c_ext],
-      zip_safe=False,
+      ext_modules=[c_ext]
      ) 

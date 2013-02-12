@@ -40,6 +40,8 @@
  *     Compiler warning fix
  *     Python 2.3 compatibility fix
  *
+ * February 10, 2013:
+ *     Added Python 3 support
  */
 
 #include <Python.h>
@@ -86,7 +88,7 @@ if (self->s == NULL || *(self->s) == NULL) { \
  *
  */
 
-#define BUF(v) PyString_AS_STRING((PyStringObject *)v)
+#define BUF(v) PyBytes_AS_STRING((PyBytesObject *)v)
 
 #if BUFSIZ < 8192
 #define SMALLCHUNK 8192
@@ -132,7 +134,7 @@ fcgi_Stream_read(fcgi_Stream *self, PyObject *args)
         return NULL;
 
     if (bytesrequested == 0)
-        return PyString_FromString("");
+        return PyBytes_FromString("");
 
     if (bytesrequested < 0)
         buffersize = new_buffersize((size_t)0);
@@ -145,7 +147,7 @@ fcgi_Stream_read(fcgi_Stream *self, PyObject *args)
         return NULL;
     }
 
-    v = PyString_FromStringAndSize((char *)NULL, buffersize);
+    v = PyBytes_FromStringAndSize((char *)NULL, buffersize);
     if (v == NULL)
         return NULL;
 
@@ -171,7 +173,7 @@ fcgi_Stream_read(fcgi_Stream *self, PyObject *args)
 
         if (bytesrequested < 0) {
             buffersize = new_buffersize(buffersize);
-            if (_PyString_Resize(&v, buffersize) < 0)
+            if (_PyBytes_Resize(&v, buffersize) < 0)
                 return NULL;
         } else {
             /* Got what was requested. */
@@ -180,7 +182,7 @@ fcgi_Stream_read(fcgi_Stream *self, PyObject *args)
     }
 
     if (bytesread != buffersize)
-        _PyString_Resize(&v, bytesread);
+        _PyBytes_Resize(&v, bytesread);
 
     return v;
 }
@@ -208,7 +210,7 @@ get_line(fcgi_Stream *self, long bytesrequested)
     s = *(self->s);
 
     if (bytesrequested == 0)
-        return PyString_FromString("");
+        return PyBytes_FromString("");
 
     if (bytesrequested < 0)
         buffersize = new_buffersize((size_t)0);
@@ -221,7 +223,7 @@ get_line(fcgi_Stream *self, long bytesrequested)
         return NULL;
     }
 
-    v = PyString_FromStringAndSize((char *)NULL, buffersize);
+    v = PyBytes_FromStringAndSize((char *)NULL, buffersize);
     if (v == NULL)
         return NULL;
 
@@ -236,7 +238,7 @@ get_line(fcgi_Stream *self, long bytesrequested)
                 if (bytesread == 0) {
                     Py_BLOCK_THREADS
                     Py_DECREF(v);
-                    return PyString_FromString("");
+                    return PyBytes_FromString("");
                 } else {
                     done = 1;
                     break;
@@ -257,13 +259,13 @@ get_line(fcgi_Stream *self, long bytesrequested)
 
         if (bytesrequested < 0) {
             buffersize = new_buffersize(buffersize);
-            if (_PyString_Resize(&v, buffersize) < 0)
+            if (_PyBytes_Resize(&v, buffersize) < 0)
                 return NULL;
         }
     }
 
     if (bytesread != buffersize)
-        _PyString_Resize(&v, bytesread);
+        _PyBytes_Resize(&v, bytesread);
 
     return v;
 }
@@ -300,7 +302,7 @@ fcgi_Stream_readlines(fcgi_Stream *self, PyObject *args)
 
     for (;;) {
         l = get_line(self, -1);
-        if (l == NULL || PyString_GET_SIZE(l) == 0) {
+        if (l == NULL || PyBytes_GET_SIZE(l) == 0) {
             Py_XDECREF(l);
             break;
         }
@@ -310,7 +312,7 @@ fcgi_Stream_readlines(fcgi_Stream *self, PyObject *args)
         if (err != 0)
             break;
 
-        total += PyString_GET_SIZE(l);
+        total += PyBytes_GET_SIZE(l);
         if (sizehint && total >= sizehint)
             break;
     }
@@ -335,7 +337,7 @@ fcgi_Stream_iternext(fcgi_Stream *self)
     fcgi_Stream_Check();
 
     l = get_line(self, -1);
-    if (l == NULL || PyString_GET_SIZE(l) == 0) {
+    if (l == NULL || PyBytes_GET_SIZE(l) == 0) {
         Py_XDECREF(l);
         return NULL;
     }
@@ -446,9 +448,9 @@ fcgi_Stream_writelines(fcgi_Stream *self, PyObject *seq)
            could potentially execute Python code. */
         for (i = 0; i < j; i++) {
             PyObject *v = PyList_GET_ITEM(list, i);
-            if (!PyString_Check(v)) {
+            if (!PyBytes_Check(v)) {
                     const char *buffer;
-                    int len;
+                    ssize_t len;
                 if (PyObject_AsReadBuffer(v,
                           (const void**)&buffer,
                                 &len) ||
@@ -459,7 +461,7 @@ fcgi_Stream_writelines(fcgi_Stream *self, PyObject *seq)
             "writelines() argument must be a sequence of strings");
                     goto error;
                 }
-                line = PyString_FromStringAndSize(buffer,
+                line = PyBytes_FromStringAndSize(buffer,
                                   len);
                 if (line == NULL)
                     goto error;
@@ -474,8 +476,8 @@ fcgi_Stream_writelines(fcgi_Stream *self, PyObject *seq)
         errno = 0;
         for (i = 0; i < j; i++) {
                 line = PyList_GET_ITEM(list, i);
-            len = PyString_GET_SIZE(line);
-            nwritten = FCGX_PutStr(PyString_AS_STRING(line), len, s);
+            len = PyBytes_GET_SIZE(line);
+            nwritten = FCGX_PutStr(PyBytes_AS_STRING(line), len, s);
             if (nwritten != len) {
                 Py_BLOCK_THREADS
                 if (nwritten < 0) {
@@ -530,7 +532,7 @@ fcgi_Stream_flush(fcgi_Stream *self)
 static void
 fcgi_Stream_dealloc(fcgi_Stream *self)
 {
-    self->ob_type->tp_free((PyObject*)self);
+    Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 #define fcgi_Stream_zero(_s) \
@@ -579,8 +581,7 @@ static PyMethodDef fcgi_Stream_methods[] = {
 };
 
 static PyTypeObject fcgi_StreamType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                         /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "fcgi.Stream" ,            /*tp_name*/
     sizeof(fcgi_Stream),       /*tp_basicsize*/
     0,                         /*tp_itemsize*/
@@ -670,12 +671,12 @@ fcgi_Request_accept(fcgi_Request *self)
         char *p = strchr(*e, '=');
         if (p == NULL)
             continue;
-        k = PyString_FromStringAndSize(*e, (int)(p-*e));
+        k = PyBytes_FromStringAndSize(*e, (int)(p-*e));
         if (k == NULL) {
             PyErr_Clear();
             continue;
         }
-        v = PyString_FromString(p + 1);
+        v = PyBytes_FromString(p + 1);
         if (v == NULL) {
             PyErr_Clear();
             Py_DECREF(k);
@@ -730,7 +731,7 @@ fcgi_Request_dealloc(fcgi_Request *self)
     FCGX_Finish_r(&self->r);
     Py_END_ALLOW_THREADS
 
-    self->ob_type->tp_free((PyObject*)self);
+    Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 static PyObject *
@@ -811,8 +812,7 @@ static PyMethodDef fcgi_Request_methods[] = {
 };
 
 static PyTypeObject fcgi_RequestType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                         /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "fcgi.Request",            /*tp_name*/
     sizeof(fcgi_Request),      /*tp_basicsize*/
     0,                         /*tp_itemsize*/
@@ -860,8 +860,25 @@ static PyMethodDef fcgi_methods[] = {
     {NULL}  /* Sentinel */
 };
 
-PyMODINIT_FUNC
-initfcgi(void) 
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef moduledef = {
+  PyModuleDef_HEAD_INIT,
+  "fcgi",                                                 /* m_name */
+  "Python wrapper for the Open Market FastCGI library.",  /* m_doc */
+  -1,                                                     /* m_size */
+  fcgi_methods,                                           /* m_methods */
+  NULL,                                                   /* m_reload */
+  NULL,                                                   /* m_traverse */
+  NULL,                                                   /* m_clear */
+  NULL,                                                   /* m_free */
+};
+#endif
+
+#if PY_MAJOR_VERSION >= 3
+PyMODINIT_FUNC PyInit_fcgi(void)
+#else
+PyMODINIT_FUNC initfcgi(void)
+#endif
 {
     PyObject* m;
 
@@ -869,19 +886,39 @@ initfcgi(void)
     FCGX_Init();
 
     if (PyType_Ready(&fcgi_StreamType) < 0)
+        #if PY_MAJOR_VERSION >= 3
+        return NULL;
+        #else
         return;
+        #endif
     if (PyType_Ready(&fcgi_RequestType) < 0)
+        #if PY_MAJOR_VERSION >= 3
+        return NULL;
+        #else
         return;
+        #endif
 
+    #if PY_MAJOR_VERSION >= 3
+    m = PyModule_Create(&moduledef);
+    #else
     m = Py_InitModule3("fcgi", fcgi_methods,
                        "Python wrapper for the Open Market FastCGI library.");
+    #endif
 
     if (m == NULL)
+      #if PY_MAJOR_VERSION >= 3
+      return NULL;
+      #else
       return;
+      #endif
 
     Py_INCREF(&fcgi_StreamType);
     PyModule_AddObject(m, "Stream", (PyObject *)&fcgi_StreamType);
 
     Py_INCREF(&fcgi_RequestType);
     PyModule_AddObject(m, "Request", (PyObject *)&fcgi_RequestType);
+
+    #if PY_MAJOR_VERSION >= 3
+    return m;
+    #endif
 }

@@ -1,4 +1,4 @@
-import fcgi
+import fastcgi.fcgi as fcgi
 import threading
 import os
 import sys
@@ -19,7 +19,7 @@ class Server:
 
             try: 
                 self.handle(req)
-            except Exception, e:
+            except Exception as e:
                 self.error(req, e)
 
     def error(self, req, e):
